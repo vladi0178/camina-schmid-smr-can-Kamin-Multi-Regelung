@@ -1,0 +1,111 @@
+                if (raw_pos < (int) sizeof(raw_log)) {
+                  raw_pos += snprintf(raw_log + raw_pos,
+                    sizeof(raw_log) - raw_pos,
+                    "%02X ", x.at(i));
+                }
+              }
+
+              id(can_raw_log).publish_state(raw_log);
+
+              id(mqtt_client).publish(
+                "smr_can/raw", raw_log, strlen(raw_log), 1, false);
+
+              // Separater Temperatur-MQTT-Wert
+              if (can_id == 0x280 && x.size() >= 8 &&
+                  x.at(0) == 0x00) {
+
+                char decoded[120];
+
+                snprintf(decoded, sizeof(decoded),
+                  "{\"temperature\":%u,\"damper\":%u,\"phase\":%u}",
+                  (unsigned int) ((x.at(2) << 8) | x.at(1)),
+                  (unsigned int) x.at(4),
+                  (unsigned int) x.at(5));
+
+                id(mqtt_client).publish(
+                  "smr_can/decoded", decoded, strlen(decoded), 1, false);
+              }
+
+              ESP_LOGD("CAN",
+                "STD #%lu ID=%s DLC=%u DATA=%s",
+                (unsigned long) id(can_frames_total),
+                id_text,
+                (unsigned int) x.size(),
+                frame_text);
+
+      # ======================================
+      # EXTENDED CAN FRAMES
+      # ======================================
+
+      - can_id: 0
+        can_id_mask: 0
+        use_extended_id: true
+
+        then:
+          - lambda: |-
+              id(can_frames_total)++;
+              id(can_extended_total)++;
+
+              uint32_t now = millis();
+
+              char id_text[20];
+
+              snprintf(id_text, sizeof(id_text),
+                "0x%08lX", (unsigned long) can_id);
+
+              id(last_can_id).publish_state(id_text);
+              id(last_can_dlc).publish_state(x.size());
+
+              char frame_text[32] = "";
+              int pos = 0;
+
+              for (size_t i = 0; i < x.size() && i < 8; i++) {
+                pos += snprintf(frame_text + pos,
+                  sizeof(frame_text) - pos, "%02X ", x.at(i));
+              }
+
+              id(last_can_data).publish_state(frame_text);
+
+              if (x.size() > 0) id(can_byte_0).publish_state(x.at(0));
+              if (x.size() > 1) id(can_byte_1).publish_state(x.at(1));
+              if (x.size() > 2) id(can_byte_2).publish_state(x.at(2));
+              if (x.size() > 3) id(can_byte_3).publish_state(x.at(3));
+              if (x.size() > 4) id(can_byte_4).publish_state(x.at(4));
+              if (x.size() > 5) id(can_byte_5).publish_state(x.at(5));
+              if (x.size() > 6) id(can_byte_6).publish_state(x.at(6));
+              if (x.size() > 7) id(can_byte_7).publish_state(x.at(7));
+
+              id(can_frame_count).publish_state(
+                id(can_frames_total));
+
+              id(can_extended_count).publish_state(
+                id(can_extended_total));
+
+              char raw_log[160];
+
+              int raw_pos = snprintf(raw_log, sizeof(raw_log),
+                "#%lu;MS=%lu;FMT=EXT;ID=0x%08lX;DLC=%u;DATA=",
+                (unsigned long) id(can_frames_total),
+                (unsigned long) now,
+                (unsigned long) can_id,
+                (unsigned int) x.size());
+
+              for (size_t i = 0; i < x.size() && i < 8; i++) {
+                if (raw_pos < (int) sizeof(raw_log)) {
+                  raw_pos += snprintf(raw_log + raw_pos,
+                    sizeof(raw_log) - raw_pos,
+                    "%02X ", x.at(i));
+                }
+              }
+
+              id(can_raw_log).publish_state(raw_log);
+
+              id(mqtt_client).publish(
+                "smr_can/raw", raw_log, strlen(raw_log), 1, false);
+
+              ESP_LOGD("CAN",
+                "EXT #%lu ID=%s DLC=%u DATA=%s",
+                (unsigned long) id(can_frames_total),
+                id_text,
+                (unsigned int) x.size(),
+                frame_text);
